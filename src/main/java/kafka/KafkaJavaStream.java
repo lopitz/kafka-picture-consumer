@@ -1,10 +1,11 @@
 package kafka;
 
+import static org.slf4j.LoggerFactory.getLogger;
+
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Stream;
 
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Throwables;
 
@@ -14,9 +15,9 @@ import kafka.message.MessageAndMetadata;
 /**
  * Encapsulates the Kafka Scala stream in a Java stream to be able to work with...
  */
-public final class KafkaJavaStream<K, V> {
+final class KafkaJavaStream<K, V> {
 
-    private final static Logger logger = LoggerFactory.getLogger(KafkaJavaStream.class);
+    private static final Logger logger = getLogger(KafkaJavaStream.class);
 
     private final LinkedBlockingQueue<MessageAndMetadata<K, V>> queue = new LinkedBlockingQueue<>();
 
@@ -24,10 +25,14 @@ public final class KafkaJavaStream<K, V> {
     }
 
     public static <K, V> Stream<MessageAndMetadata<K, V>> of(KafkaStream<K, V> stream) {
-        KafkaJavaStream instance = new KafkaJavaStream();
+        KafkaJavaStream<K, V> instance = new KafkaJavaStream<>();
         new Thread(() -> {
-            stream.forEach(messageAndMetadata -> {
-                instance.queue.offer(messageAndMetadata);
+            stream.forEach(messageAndMetaData -> {
+                instance.queue.offer(messageAndMetaData);
+                String key = new String((byte[]) messageAndMetaData.key());
+                if (key.contains("15")) {
+                    logger.info("received image {} from kafka", key);
+                }
             });
         }).start();
         return instance.createStream();

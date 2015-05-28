@@ -11,7 +11,6 @@ import java.awt.image.BufferedImage;
 import java.awt.image.ImageObserver;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.lang.reflect.InvocationTargetException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
@@ -25,8 +24,10 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
+import javax.swing.WindowConstants;
 
 import org.slf4j.Logger;
+import org.springframework.beans.factory.annotation.Value;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
@@ -36,10 +37,14 @@ public class Ui {
 
     private static final Logger logger = getLogger(Ui.class);
 
+    private final LinkedBlockingQueue<Image> images = new LinkedBlockingQueue<>();
+
     private ImagePanel imageCanvas;
     private JLabel fileNameLabel;
     private JLabel statusLabel;
-    private LinkedBlockingQueue<Image> images = new LinkedBlockingQueue<>();
+
+    @Value("${kafka.group.id}")
+    private String groupId;
 
     @Inject
     private MetricRegistry metrics;
@@ -50,6 +55,42 @@ public class Ui {
     public void run() {
         timer = metrics.timer(MetricRegistry.name("inbound.kafka.images"));
         SwingUtilities.invokeLater(this::createAndShowGui);
+        startUpdatingImages();
+    }
+
+    private void createAndShowGui() {
+        JFrame frame = createMainWindow();
+        Container contentPane = frame.getContentPane();
+        contentPane.setLayout(new BorderLayout());
+        fileNameLabel = createAndInsertLabel(contentPane, "Waiting for images...", BorderLayout.NORTH);
+        imageCanvas = createAndAddImageCanvas(contentPane);
+        statusLabel = createAndInsertLabel(contentPane, "Status", BorderLayout.SOUTH);
+        frame.pack();
+        frame.setVisible(true);
+    }
+
+    private JFrame createMainWindow() {
+        JFrame frame = new JFrame(String.format("Kafka Picture Consumer - consumer group #%s", groupId));
+        frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
+        frame.setMinimumSize(new Dimension(800, 600));
+        return frame;
+    }
+
+    private JLabel createAndInsertLabel(Container contentPane, String text, String position) {
+        JLabel result  = new JLabel(text);
+        contentPane.add(result, position);
+        return result;
+    }
+
+    private ImagePanel createAndAddImageCanvas(Container contentPane) {
+        ImagePanel result = new ImagePanel();
+        result.setBackground(Color.black);
+        contentPane.add(result, BorderLayout.CENTER);
+        result.setDoubleBuffered(true);
+        return result;
+    }
+
+    private void startUpdatingImages() {
         new Thread(() -> {
             boolean killme = false;
             while (!killme) {
@@ -57,6 +98,7 @@ public class Ui {
                     Image image = images.take();
                     refresh(image);
                 } catch (InterruptedException e) {
+                    logger.warn("update of images was interrupted");
                     killme = true;
                 }
             }
@@ -66,6 +108,9 @@ public class Ui {
     private void refresh(Image image) {
         try {
             SwingUtilities.invokeAndWait(() -> {
+                if (image.name.contains("1520")) {
+                    logger.info("update with images {}", image.name);
+                }
                 fileNameLabel.setText(image.name);
                 try {
                     imageCanvas.updateImage(image.bufferedImage);
@@ -77,23 +122,6 @@ public class Ui {
         } catch (Exception e) {
             SwingUtilities.invokeLater(() -> statusLabel.setText(e.getLocalizedMessage()));
         }
-    }
-
-    private void createAndShowGui() {
-        JFrame frame = new JFrame("Kafka Picture Consumer");
-        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        frame.setMinimumSize(new Dimension(800, 600));
-        fileNameLabel = new JLabel("Hello World");
-        Container contentPane = frame.getContentPane();
-        contentPane.setLayout(new BorderLayout());
-        contentPane.add(fileNameLabel, BorderLayout.NORTH);
-        imageCanvas = new ImagePanel();
-        imageCanvas.setBackground(Color.black);
-        contentPane.add(imageCanvas, BorderLayout.CENTER);
-        statusLabel = new JLabel("Status");
-        contentPane.add(statusLabel, BorderLayout.SOUTH);
-        frame.pack();
-        frame.setVisible(true);
     }
 
     public void updateImage(String imageName, byte[] rawData) {
@@ -110,18 +138,19 @@ public class Ui {
 
     private static class ImagePanel extends JPanel implements ImageObserver {
 
-        private BufferedImage image;
-        private Lock lock = new ReentrantLock();
+        private final Lock lock = new ReentrantLock();
 
-        public void updateImage(BufferedImage image) throws InvocationTargetException, InterruptedException {
+        private BufferedImage image;
+
+        public void updateImage(BufferedImage image) throws InterruptedException {
             lock.tryLock(5, TimeUnit.SECONDS);
             this.image = image;
             repaint();
         }
 
         @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
+        public void paint(Graphics g) {
+            super.paint(g);
             if (image != null) {
                 g.drawImage(image, (getWidth() - image.getWidth()) / 2, (getHeight() - image.getHeight()) / 2, this);
             }

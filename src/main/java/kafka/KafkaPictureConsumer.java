@@ -45,15 +45,13 @@ public class KafkaPictureConsumer {
     }
 
     private void handleKafkaEvents() {
-        kafkaStreams.forEach(stream -> {
-            new Thread(() -> {
-                stream.forEach(messageAndMetadata -> {
-                    metricRegistry.counter(
-                            MetricRegistry.name("outbound", "kafka", "consuming")).inc();
-                    ui.updateImage(new String(messageAndMetadata.key()), messageAndMetadata.message());
-                });
-            }).start();
-        });
+        kafkaStreams.forEach(stream -> new Thread(() -> {
+            stream.forEach(messageAndMetadata -> {
+                metricRegistry.counter(
+                        MetricRegistry.name("outbound", "kafka", "consuming")).inc();
+                ui.updateImage(new String(messageAndMetadata.key()), messageAndMetadata.message());
+            });
+        }).start());
     }
 
     @PreDestroy
