@@ -72,7 +72,7 @@ public class Ui {
     private JFrame createMainWindow() {
         JFrame frame = new JFrame(String.format("Kafka Picture Consumer - consumer group #%s", groupId));
         frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-        frame.setMinimumSize(new Dimension(800, 600));
+        frame.setMinimumSize(new Dimension(400, 300));
         return frame;
     }
 
@@ -108,9 +108,6 @@ public class Ui {
     private void refresh(Image image) {
         try {
             SwingUtilities.invokeAndWait(() -> {
-                if (image.name.contains("1520")) {
-                    logger.info("update with images {}", image.name);
-                }
                 fileNameLabel.setText(image.name);
                 try {
                     imageCanvas.updateImage(image.bufferedImage);
