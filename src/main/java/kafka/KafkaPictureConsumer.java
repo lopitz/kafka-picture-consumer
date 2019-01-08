@@ -49,7 +49,9 @@ public class KafkaPictureConsumer {
             stream.forEach(messageAndMetadata -> {
                 metricRegistry.counter(
                         MetricRegistry.name("outbound", "kafka", "consuming")).inc();
-                ui.updateImage(new String(messageAndMetadata.key()), messageAndMetadata.message());
+                byte[] key = messageAndMetadata.key();
+                String imageName = key == null ? "" : new String(key);
+                ui.updateImage(imageName, messageAndMetadata.message());
             });
         }).start());
     }
