@@ -1,0 +1,6 @@
+kafka:
+  topic: images
+  group:
+    id: images
+  bootstrap:
+    servers: localhost:9092
