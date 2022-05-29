@@ -46,6 +46,6 @@ This project uses [Maven](https://maven.apache.org/) for building the applicatio
 
 to build the executable jar file. You then will find it under target.
 
-[1]: ../../../kafka-picture-producer) 
+[1]: ../../../kafka-picture-producer 
 [2]: ../../../kafka-picture-producer/blob/main/README.md#demo
 [3]: ../../../kafka-picture-producer/blob/master/README.md#test-setup
